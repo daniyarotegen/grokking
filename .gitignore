@@ -1,0 +1,21 @@
+# Python & virtual environments
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Experiment outputs & large binaries
+runs/
+**/runs/
+*.pt
+*.pth
+*.ckpt
+*.log
+
+# macOS & IDEs
+.DS_Store
+.idea/
+.vscode/
+.ipynb_checkpoints/
