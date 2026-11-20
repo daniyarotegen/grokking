@@ -7,8 +7,6 @@ __pycache__/
 .pytest_cache/
 
 # Experiment outputs & large binaries
-runs/
-**/runs/
 *.pt
 *.pth
 *.ckpt

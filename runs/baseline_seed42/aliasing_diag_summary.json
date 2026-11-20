@@ -1,0 +1,170 @@
+{
+  "active_freqs_gt_0p5pct": [
+    10,
+    12,
+    56
+  ],
+  "final_key_freqs": [
+    10,
+    12,
+    56
+  ],
+  "freq_summary": [
+    {
+      "k": 10,
+      "survives_final_K": true,
+      "peak_var_share_pct": 91.96080247656595,
+      "peak_var_epoch": 7500,
+      "final_var_share_pct": 91.25106601107409,
+      "peak_l2_norm": 64893.20588306492,
+      "peak_l2_epoch": 5750,
+      "final_l2_norm": 59220.679042810356
+    },
+    {
+      "k": 56,
+      "survives_final_K": true,
+      "peak_var_share_pct": 43.76131365228051,
+      "peak_var_epoch": 3250,
+      "final_var_share_pct": 4.613417006735938,
+      "peak_l2_norm": 15833.699070801063,
+      "peak_l2_epoch": 4250,
+      "final_l2_norm": 13315.754073231068
+    },
+    {
+      "k": 12,
+      "survives_final_K": true,
+      "peak_var_share_pct": 5.019278179708684,
+      "peak_var_epoch": 4250,
+      "final_var_share_pct": 2.5103109638277803,
+      "peak_l2_norm": 9981.248884568595,
+      "peak_l2_epoch": 11250,
+      "final_l2_norm": 9822.412550357618
+    }
+  ],
+  "final_epoch_alias_pred_active": {
+    "active_k_used": [
+      10,
+      12,
+      56
+    ],
+    "l2_weights": {
+      "10": 0.7190566910406728,
+      "12": 0.11926360150971602,
+      "56": 0.16167970744961108
+    },
+    "var_weights": {
+      "10": 0.9275858410245473,
+      "12": 0.02551782689675918,
+      "56": 0.046896332078693426
+    },
+    "delta_star_l2": 56,
+    "score_l2_max": 0.8063812004274974,
+    "score_l2_delta12": 0.7998736509458136,
+    "top3_l2": [
+      {
+        "delta": 56,
+        "score": 0.8063812004274974
+      },
+      {
+        "delta": 10,
+        "score": 0.8050547610912793
+      },
+      {
+        "delta": 12,
+        "score": 0.7998736509458136
+      }
+    ],
+    "delta_star_var": 34,
+    "score_var_max": 0.9340133053145521,
+    "score_var_delta12": 0.8986298779336777,
+    "top3_var": [
+      {
+        "delta": 34,
+        "score": 0.9340133053145521
+      },
+      {
+        "delta": 56,
+        "score": 0.9167307082920645
+      },
+      {
+        "delta": 45,
+        "score": 0.9117028039259704
+      }
+    ]
+  },
+  "final_epoch_alias_pred_final_k": {
+    "active_k_used": [
+      10,
+      12,
+      56
+    ],
+    "l2_weights": {
+      "10": 0.7190566910406728,
+      "12": 0.11926360150971602,
+      "56": 0.16167970744961108
+    },
+    "var_weights": {
+      "10": 0.9275858410245473,
+      "12": 0.02551782689675918,
+      "56": 0.046896332078693426
+    },
+    "delta_star_l2": 56,
+    "score_l2_max": 0.8063812004274974,
+    "score_l2_delta12": 0.7998736509458136,
+    "top3_l2": [
+      {
+        "delta": 56,
+        "score": 0.8063812004274974
+      },
+      {
+        "delta": 10,
+        "score": 0.8050547610912793
+      },
+      {
+        "delta": 12,
+        "score": 0.7998736509458136
+      }
+    ],
+    "delta_star_var": 34,
+    "score_var_max": 0.9340133053145521,
+    "score_var_delta12": 0.8986298779336777,
+    "top3_var": [
+      {
+        "delta": 34,
+        "score": 0.9340133053145521
+      },
+      {
+        "delta": 56,
+        "score": 0.9167307082920645
+      },
+      {
+        "delta": 45,
+        "score": 0.9117028039259704
+      }
+    ]
+  },
+  "final_epoch_full_margins": {
+    "alias_margin_mean": 17.39116787934466,
+    "alias_margin_p01": 13.875316009521484,
+    "alias_margin_min": -68.38676834106445,
+    "other_margin_mean": 17.221770670099513,
+    "other_margin_p01": 14.380568542480468,
+    "other_margin_min": -61.17417526245117,
+    "err_delta12": 46,
+    "err_other": 4,
+    "err_total": 50
+  },
+  "final_epoch_restricted_margins": {
+    "alias_margin_mean": 15.772654701770637,
+    "alias_margin_p01": 9.740574094356475,
+    "alias_margin_min": 7.965640264948263,
+    "other_margin_mean": 16.112435417560032,
+    "other_margin_p01": 12.24755995556834,
+    "other_margin_min": 11.244767091702514,
+    "err_delta12": 0,
+    "err_other": 0,
+    "err_total": 0
+  },
+  "output_jsonl": "grokking/runs/baseline_seed42/aliasing_diag.jsonl",
+  "figure_path": "grokking/artifacts/figures/fig4_seed42_aliasing_dynamics.png"
+}

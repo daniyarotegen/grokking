@@ -1,0 +1,60 @@
+{
+  "wd": 0.5,
+  "seed": 0,
+  "epochs": 40000,
+  "git_commit": "0fd723a2369494ca31ef9e70d14a3e6c5a6fddf9",
+  "wall_time_s": 88.70723879300022,
+  "grok_epoch_95": 10000,
+  "train_loss": 0.00014885433018839133,
+  "test_loss": 0.00019482092676886858,
+  "train_acc": 1.0,
+  "test_acc": 1.0,
+  "weight_l2_norm": 27.53203113742483,
+  "key_freqs": [
+    1,
+    8,
+    21
+  ],
+  "n_key_freqs": 3,
+  "key_freq_var_shares": {
+    "1": 0.04502266642620947,
+    "8": 0.7998414330042136,
+    "21": 0.14257207166586403
+  },
+  "key_freq_amp_weights": {
+    "1": 0.14297140090769658,
+    "8": 0.6026088636422489,
+    "21": 0.25441973545005475
+  },
+  "key_freqs_total_var_share": 0.9874361710962871,
+  "trig_sum_total_var_share": 0.9878461460021544,
+  "n_eff": 1.4738554042429015,
+  "restricted_test_loss": 0.00011247977836618172,
+  "restricted_test_acc": 1.0,
+  "restricted_test_errors": 0,
+  "excluded_train_loss": 7.475381569447724,
+  "excluded_train_acc": 0.01671018276762402,
+  "total_test_errors": 0,
+  "error_offset_histogram": {},
+  "top3_predicted_deltas": [
+    {
+      "delta": 1,
+      "score": 0.7865238872525163
+    },
+    {
+      "delta": 27,
+      "score": 0.7746061765947716
+    },
+    {
+      "delta": 16,
+      "score": 0.7457958327499649
+    }
+  ],
+  "errors_in_top1_alias": 0,
+  "errors_in_top3_alias": 0,
+  "frac_errors_in_top1_alias": null,
+  "frac_errors_in_top3_alias": null,
+  "resid_norm_mean_correct": 25.011207480481502,
+  "resid_norm_mean_wrong": null,
+  "resid_norm_ratio_wrong_over_correct": null
+}

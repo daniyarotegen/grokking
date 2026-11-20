@@ -1,0 +1,18 @@
+{
+  "epochs": 200,
+  "loop_elapsed_s": 0.5379271580000022,
+  "sec_per_1k_epochs": 2.689635790000011,
+  "peak_vram_allocated_mb": 265.18603515625,
+  "peak_vram_reserved_mb": 296.0,
+  "checkpoint_size_bytes": 911157,
+  "num_checkpoints": 2,
+  "final_metrics": {
+    "epoch": 200,
+    "train_loss": 0.020375281834935307,
+    "test_loss": 17.212278766683355,
+    "train_acc": 1.0,
+    "test_acc": 0.014766752433158071,
+    "weight_l2_norm": 57.98805262329019,
+    "elapsed_s": 0.7636183370000253
+  }
+}

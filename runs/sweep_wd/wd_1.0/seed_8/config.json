@@ -1,0 +1,28 @@
+{
+  "wd": 1.0,
+  "seed": 8,
+  "epochs": 40000,
+  "lr": 0.001,
+  "betas": [
+    0.9,
+    0.98
+  ],
+  "p": 113,
+  "train_frac": 0.3,
+  "log_every": 500,
+  "model_config": {
+    "vocab_size": 114,
+    "n_classes": 113,
+    "seq_len": 3,
+    "d_model": 128,
+    "n_heads": 4,
+    "d_head": 32,
+    "d_mlp": 512,
+    "use_mlp_bias": true
+  },
+  "num_parameters": 226688,
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 5070",
+  "torch_version": "2.15.0+cu132",
+  "git_commit": "0fd723a2369494ca31ef9e70d14a3e6c5a6fddf9"
+}

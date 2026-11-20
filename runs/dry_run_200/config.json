@@ -1,0 +1,34 @@
+{
+  "train_config": {
+    "p": 113,
+    "train_frac": 0.3,
+    "seed": 42,
+    "epochs": 200,
+    "lr": 0.001,
+    "weight_decay": 1.0,
+    "beta1": 0.9,
+    "beta2": 0.98,
+    "log_every": 100,
+    "save_every": 1000,
+    "out_dir": "grokking/runs/dry_run_200",
+    "device": "cuda",
+    "use_mlp_bias": true
+  },
+  "model_config": {
+    "vocab_size": 114,
+    "n_classes": 113,
+    "seq_len": 3,
+    "d_model": 128,
+    "n_heads": 4,
+    "d_head": 32,
+    "d_mlp": 512,
+    "use_mlp_bias": true
+  },
+  "num_parameters": 226688,
+  "n_train": 3830,
+  "n_test": 8939,
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 5070",
+  "torch_version": "2.15.0+cu132",
+  "git_commit": "not-a-git-repo"
+}
