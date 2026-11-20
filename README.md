@@ -2,6 +2,8 @@
 
 From-scratch PyTorch + `einops` reproduction of **Nanda et al. (2023)**, *"Progress measures for grokking via mechanistic interpretability"*, extended with a zero-training aliasing diagnostic (Stage 4A), a 30-run multi-seed weight-decay sweep (Stage 4B), and a `seed = 42` double-dissociation control.
 
+Limitations and robustness checks are in [Section 6](#6-limitations--robustness-checks).
+
 ---
 
 ## 1. Task, Architecture & Numerics
@@ -89,38 +91,83 @@ This yields a clean **double dissociation**:
 
 ## 5. Reproducibility
 
-Run all commands from the workspace root (`/home/ml-agent/ml-repro`):
+The code imports itself as the package `grokking`, so run every command from the folder that **contains** the clone, not from inside it.
 
 ```bash
-# Stage 1: Mandatory pre-training sanity suite (6 tests: shapes, causal mask, split, CPU+CUDA determinism, overfit)
-/home/ml-agent/ml-repro/.venv/bin/pytest grokking/tests/test_sanity.py -v
+git clone https://github.com/daniyarotegen/grokking.git    # creates ./grokking
+python -m venv .venv && source .venv/bin/activate
+# RTX 50-series (Blackwell) GPUs need a PyTorch build for CUDA 12.8 or later:
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+pip install -r grokking/requirements.txt
 
-# Stage 2: 40,000-epoch baseline run (seed=42, wd=1.0, 161 checkpoints)
-timeout 20m /home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.train \
-  --epochs 40000 --seed 42 --log-every 100 --save-every 250 \
+# Sanity suite: shapes, causal mask, split, CPU + CUDA determinism, overfit
+pytest grokking/tests/test_sanity.py -v
+
+# Stage 2: 40,000-epoch baseline (seed 42, wd 1.0, 161 checkpoints)
+python -m grokking.src.train --epochs 40000 --seed 42 --log-every 100 --save-every 250 \
   --out-dir grokking/runs/baseline_seed42 --device cuda
 
-# Stage 3: 2D DFT verification, progress measures, and Figures 1–3
-/home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.analysis \
-  --run-dir grokking/runs/baseline_seed42 --figures-dir grokking/artifacts/figures --device cuda
+# Stage 3: 2D DFT verification, progress measures, Figures 1–3
+python -m grokking.src.analysis --run-dir grokking/runs/baseline_seed42 \
+  --figures-dir grokking/artifacts/figures --device cuda
 
-# Stage 4A: Zero-training aliasing & frequency-dominance diagnostic + Figure 4
-/home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.aliasing_diag \
-  --run-dir grokking/runs/baseline_seed42 --figures-dir grokking/artifacts/figures --device cuda
+# Stage 4A: aliasing and frequency-dominance diagnostic, Figure 4
+python -m grokking.src.aliasing_diag --run-dir grokking/runs/baseline_seed42 \
+  --figures-dir grokking/artifacts/figures --device cuda
 
-# Stage 4B: Resumable 30-run weight-decay sweep (wd in {0.5, 1.0, 1.5}, seeds 0–9) + Figures 5–6
+# Stage 4B: resumable 30-run sweep (wd in {0.5, 1.0, 1.5}, seeds 0–9), Figures 5–6
 for WD in 1.0 0.5 1.5; do
-  timeout 20m /home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.sweep \
-    --wd "$WD" --seeds 0 1 2 3 4 5 6 7 8 9 --epochs 40000 \
+  python -m grokking.src.sweep --wd "$WD" --seeds 0 1 2 3 4 5 6 7 8 9 --epochs 40000 \
     --out-root grokking/runs/sweep_wd --device cuda
 done
-/home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.sweep_plots \
-  --out-root grokking/runs/sweep_wd --figures-dir grokking/artifacts/figures
+python -m grokking.src.sweep_plots --out-root grokking/runs/sweep_wd \
+  --figures-dir grokking/artifacts/figures
 
-# Seed 42 weight-decay control (wd = 0.5 and 1.5)
+# Seed 42 weight-decay control (wd 0.5 and 1.5)
 for WD in 0.5 1.5; do
-  timeout 10m /home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.sweep \
-    --wd "$WD" --seeds 42 --epochs 40000 \
+  python -m grokking.src.sweep --wd "$WD" --seeds 42 --epochs 40000 \
     --out-root grokking/runs/seed42_wd_check --device cuda
 done
+
+# Robustness checks behind Section 6 (numpy + scipy only; reads the committed runs/)
+python -m grokking.src.robustness
 ```
+
+`runs/` holds every metric and summary file but no checkpoints (`*.pt` is ignored), so Stages 3 and 4A need Stage 2 to be re-run first. `sweep_plots` and `robustness` work straight from a fresh clone.
+
+---
+
+## 6. Limitations & Robustness Checks
+
+The numbers below come from `python -m grokking.src.robustness`, which re-reads the committed sweep outputs and treats the seed, not the run, as the unit of replication.
+
+1. **The error phenomenon appears in one seed.** All 30 sweep runs (seeds 0–9) reach 100.00% test accuracy at every weight decay. Every finding about where errors fall (Sections 3 and 4.2) therefore comes from `seed = 42` alone, at two weight decays. These findings describe this seed's mechanism; they are not evidence that under-regularised models of this task generally fail this way.
+
+2. **The seed sets both the initialisation and the train/test split.** `set_seed(seed)` runs before the dataset is built, and the split is drawn from the same seed. "Spectral lock-in by initialisation" (law 2) could equally be lock-in by data split, and seed 42's errors could be a property of its split. Separating the two needs independent seeds for initialisation and split.
+
+3. **Law 3 does not hold once seeds are the unit.** The 30 runs are 10 seeds × 3 weight decays, and law 2 shows the seed largely fixes the circuit, so the runs are not independent samples. With one point per seed:
+
+   | | Pooled (n = 30) | One point per seed (n = 10) |
+   | :--- | :---: | :---: |
+   | `\|K\|` vs. residual norm | ρ = −0.767, p = 7.5 × 10⁻⁷ | ρ = −0.440, p = 0.20 |
+   | $N_{\text{eff}}$ vs. residual norm | ρ = −0.576, p = 8.7 × 10⁻⁴ | ρ = −0.552, p = 0.098 |
+
+   The direction is unchanged but the evidence is weak. Treat law 3 as a hypothesis.
+
+4. **Law 1 holds up.** Fitting log(`grok_epoch_95`) = a_seed + β · log(`wd`), with a separate intercept per seed, gives **β = −0.964, 95% CI [−1.049, −0.879]** (t, 19 dof). Nine of ten per-seed slopes lie between −0.86 and −1.16 (seed 9: −0.71). Grokking time scales approximately as 1 / `wd`, measured at only three weight-decay values per seed.
+
+5. **The alias analysis was post hoc, and it predicts a set of offsets rather than a ranking.**
+   - `EXPERIMENT_SPEC.md` does not mention aliasing; the analysis was built after the 50 errors were observed.
+   - The code computes two weightings. Amplitude weights ($w_k \propto \sqrt{E_k}$, used throughout) give a top-3 of ±56, ±10, ±12. Variance weights ($w_k \propto E_k$) give ±34, ±56, ±45, which contain none of the 50 errors. Amplitude weighting is the principled choice, since logits are linear in amplitude, but the result depends on it.
+   - At `wd = 1.0` the three top scores are nearly tied (0.806, 0.805, 0.800), and the top-ranked offset (±56) receives no errors.
+   - At `wd = 0.5` the predicted set is ±10, ±47, ±22. Errors land at ±22 (27), ±36 (8) and ±55 (3); the top two predictions receive none.
+
+   The supported claim: when the key frequencies change, errors leave ±12 and concentrate on a predicted alias, far above the 5.36% chance rate. The analysis does not predict which alias dominates.
+
+6. **One task, one architecture, one training fraction.** Whether the residual-spike mechanism appears for other moduli, deeper models or training fractions other than 30% is untested.
+
+---
+
+## 7. How This Was Built
+
+The code, experiments and first draft of this write-up were produced with an AI coding agent running on my own machine, which I directed and reviewed. **[Edit before merging: describe your part — e.g. choosing the extension, forming the hypotheses, designing the controls, checking the results.]**
