@@ -1,8 +1,6 @@
-# Tested with torch 2.15.0+cu132 and einops 0.8.2 (see README, Section 1).
-# On RTX 50-series GPUs install torch from the CUDA 12.8+ index first (README, Section 5).
-torch>=2.7
-einops>=0.8
-numpy
-scipy
-matplotlib
-pytest
+torch>=2.15.0
+einops>=0.8.2
+numpy>=2.5.5
+scipy>=1.18.1
+matplotlib>=3.11.2
+pytest>=9.2.0
