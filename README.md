@@ -133,6 +133,14 @@ done
 python -m grokking.src.robustness
 ```
 
+Stage 5 (weight-decay experiments, pre-registered in [`prereg/WD_PREREGISTRATION.md`](prereg/WD_PREREGISTRATION.md); 110 runs, about 5–6 h on an RTX 5070):
+
+```bash
+python -m grokking.src.wd_experiments --dry-run                      # list the runs
+python -m grokking.src.wd_experiments --experiments E2 E3 E1 E4      # resumable
+python -m grokking.src.wd_analysis                                   # score against frozen predictions
+```
+
 `runs/` holds every metric and summary file but no checkpoints (`*.pt` is ignored), so Stages 3 and 4A need Stage 2 to be re-run first. `sweep_plots` and `robustness` work straight from a fresh clone.
 
 ---

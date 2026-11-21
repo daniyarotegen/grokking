@@ -58,21 +58,36 @@ def run_single_sweep_member(
     beta1: float = 0.9,
     beta2: float = 0.98,
     key_var_threshold: float = 0.01,
+    init_seed: int | None = None,
+    split_seed: int | None = None,
+    init_scale: float = 1.0,
+    run_dir: Path | None = None,
 ) -> dict[str, object]:
-    """Train one (wd, seed) run (or skip if already completed) and save sweep_record.json."""
-    run_dir = out_root / f"wd_{wd:.1f}" / f"seed_{seed}"
+    """Train one (wd, seed) run (or skip if already completed) and save sweep_record.json.
+
+    By default `seed` sets both the weight initialisation and the train/test split.
+    `init_seed` and `split_seed` override them separately; `init_scale` multiplies every
+    parameter after initialisation (the alpha of Lyu et al., 2024). With the defaults the
+    run is identical to the original Stage 4B sweep.
+    """
+    init_seed = seed if init_seed is None else init_seed
+    split_seed = seed if split_seed is None else split_seed
+    if run_dir is None:
+        run_dir = out_root / f"wd_{wd:.1f}" / f"seed_{seed}"
     record_path = run_dir / "sweep_record.json"
     if record_path.exists():
-        print(f"[SKIP] wd={wd:.1f} seed={seed} -> {record_path} already exists", flush=True)
+        print(f"[SKIP] {run_dir} already done", flush=True)
         return json.loads(record_path.read_text())
 
     ckpt_dir = run_dir / "checkpoints"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     git_commit = get_git_commit_hash()
-    set_seed(seed)
+    set_seed(init_seed)
 
-    data = make_modular_addition_dataset(p=p, train_frac=train_frac, seed=seed).to(device)
+    # The split uses its own torch.Generator, so it does not consume the global RNG
+    # that initialises the model below.
+    data = make_modular_addition_dataset(p=p, train_frac=train_frac, seed=split_seed).to(device)
     model_cfg = TransformerConfig(
         vocab_size=p + 1,
         n_classes=p,
@@ -80,6 +95,11 @@ def run_single_sweep_member(
         use_mlp_bias=True,
     )
     model = OneLayerTransformer(model_cfg).to(device)
+    if init_scale != 1.0:
+        with torch.no_grad():
+            for param in model.parameters():
+                param.mul_(init_scale)
+    initial_weight_l2 = compute_weight_l2_norm(model)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=lr,
@@ -90,6 +110,10 @@ def run_single_sweep_member(
     run_meta = {
         "wd": wd,
         "seed": seed,
+        "init_seed": init_seed,
+        "split_seed": split_seed,
+        "init_scale": init_scale,
+        "initial_weight_l2_norm": initial_weight_l2,
         "epochs": epochs,
         "lr": lr,
         "betas": [beta1, beta2],
@@ -255,6 +279,11 @@ def run_single_sweep_member(
     sweep_record: dict[str, object] = {
         "wd": wd,
         "seed": seed,
+        "init_seed": init_seed,
+        "split_seed": split_seed,
+        "init_scale": init_scale,
+        "lr": lr,
+        "log_every": log_every,
         "epochs": epochs,
         "git_commit": git_commit,
         "wall_time_s": wall_time_s,
@@ -294,7 +323,7 @@ def run_single_sweep_member(
     tmp_path.replace(record_path)
 
     print(
-        f"[DONE] wd={wd:.1f} seed={seed:2d} | t={wall_time_s:5.1f}s | "
+        f"[DONE] {run_dir.parent.name}/{run_dir.name} | t={wall_time_s:5.1f}s | "
         f"grok95={str(grok_epoch_95):>6s} | test_acc={sweep_record['test_acc']:.4f} "
         f"(err={total_test_errors:4d}, rest_err={restricted_test_errors:4d}) | "
         f"|K|={len(key_freqs)} N_eff={n_eff:.2f} K={key_freqs} | "
