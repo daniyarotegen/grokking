@@ -80,7 +80,7 @@ This yields a clean **double dissociation**:
 
 ### 4.3 Three Empirical Laws Across the 30-Run Sweep
 
-1. **Weight-decay budget invariance (`grok_epoch_95 × wd ≈ const(seed)`):** Medians across `wd = 0.5, 1.0, 1.5` are **`7,875`**, **`7,500`**, **`7,500`**. Median within-seed CV is **`7.45%`** (mean `8.61%`) vs. between-seed CV of **`31.75%`** (4.3× larger).
+1. **Weight-decay budget invariance (`grok_epoch_95 × wd ≈ const(seed)`):** Medians across `wd = 0.5, 1.0, 1.5` are **`7,875`**, **`7,500`**, **`7,500`**. Median within-seed CV is **`7.45%`** (mean `8.61%`) vs. between-seed CV of **`31.75%`** (4.3× larger). This 1 / `wd` scaling is not new: Lyu et al. (2024) prove that grokking time is $t_g = \frac{1}{\lambda}\log\alpha$ for homogeneous networks with large initialisation scale $\alpha$ and small weight decay $\lambda$. The sweep is an empirical check of the $1/\lambda$ part on a transformer, which is not homogeneous.
 2. **Spectral lock-in by initialization / split:** Pairwise Jaccard overlap of surviving `K` across `wd` for the **same seed** is **`0.7775`** mean / **`0.8000`** median (`40.0%` exact matches, `n = 30` pairs), vs. **`0.0326`** mean / **`0.0000`** median for **different seeds** (`n = 405` pairs; **24×** higher within-seed lock-in).
 3. **Sparsity–residual tradeoff & equilibrium invariance:** Fewer or less balanced frequencies systematically carry larger non-key residuals (`|K|` vs. `resid_norm_mean_correct`: Spearman **$\rho = -0.7674, p = 7.50 \times 10^{-7}$**; $N_{\text{eff}}$ vs. residual: **$\rho = -0.5760, p = 8.66 \times 10^{-4}$**). Meanwhile, final equilibrium geometry is invariant to `wd ∈ [0.5, 1.5]` (Kruskal-Wallis: $N_{\text{eff}}$ $H = 0.61, p = 0.737$; `weight_l2_norm` $H = 3.26, p = 0.196$, medians `30.38, 29.80, 30.11`; `|K|` $H = 1.59, p = 0.452$). Projecting onto `K` reduces final test loss by a median factor of **`3.56×`** (IQR `[2.89×, 5.75×]`, improving **29 / 30** runs).
 
@@ -154,7 +154,7 @@ The numbers below come from `python -m grokking.src.robustness`, which re-reads 
 
    The direction is unchanged but the evidence is weak. Treat law 3 as a hypothesis.
 
-4. **Law 1 holds up.** Fitting log(`grok_epoch_95`) = a_seed + β · log(`wd`), with a separate intercept per seed, gives **β = −0.964, 95% CI [−1.049, −0.879]** (t, 19 dof). Nine of ten per-seed slopes lie between −0.86 and −1.16 (seed 9: −0.71). Grokking time scales approximately as 1 / `wd`, measured at only three weight-decay values per seed.
+4. **Law 1 holds up.** Fitting log(`grok_epoch_95`) = a_seed + β · log(`wd`), with a separate intercept per seed, gives **β = −0.964, 95% CI [−1.049, −0.879]** (t, 19 dof). Nine of ten per-seed slopes lie between −0.86 and −1.16 (seed 9: −0.71). Grokking time scales approximately as 1 / `wd`, measured at only three weight-decay values per seed. This confirms a known theoretical prediction (Lyu et al., 2024; see Section 4.3) rather than establishing a new law; the $\log\alpha$ dependence that the theory also predicts was not tested here.
 
 5. **The alias analysis was post hoc, and it predicts a set of offsets rather than a ranking.**
    - `EXPERIMENT_SPEC.md` does not mention aliasing; the analysis was built after the 50 errors were observed.
@@ -171,3 +171,10 @@ The numbers below come from `python -m grokking.src.robustness`, which re-reads 
 ## 7. How This Was Built
 
 The code, experiments and first draft of this write-up were produced with an AI coding agent running on my own machine, which I directed and reviewed. **[Edit before merging: describe your part — e.g. choosing the extension, forming the hypotheses, designing the controls, checking the results.]**
+
+---
+
+## References
+
+- Lyu, K., Jin, J., Li, Z., Du, S. S., Lee, J. D., & Hu, W. (2024). Dichotomy of early and late phase implicit biases can provably induce grokking. *ICLR 2024*. [arXiv:2311.18817](https://arxiv.org/abs/2311.18817)
+- Nanda, N., Chan, L., Lieberum, T., Smith, J., & Steinhardt, J. (2023). Progress measures for grokking via mechanistic interpretability. *ICLR 2023*. [arXiv:2301.05217](https://arxiv.org/abs/2301.05217)
