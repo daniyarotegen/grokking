@@ -11,7 +11,7 @@ Limitations and robustness checks are in [Section 6](#6-limitations--robustness-
 - **Task:** Modular addition `(a + b) mod 113` formatted as 3 tokens `[a, b, =]` (`=` has ID `113`, vocab `114`, output classes `113`, target at final position index `2`). Deterministic 30% / 70% disjoint split (`3,830` train / `8,939` test pairs covering all `113 × 113 = 12,769` pairs).
 - **Model ([`src/model.py`](src/model.py)):** 1-layer causal Transformer decoder (**226,688** params), no LayerNorm, learned positional embeddings (length `3`), untied `W_E` and `W_U`, ReLU MLP with biases (`b_in`, `b_out`), no attention/unembedding biases, `1 / sqrt(fan_in)` normal init, `d_model = 128`, `n_heads = 4` (`d_head = 32`), `d_mlp = 512`. All 9 weight matrices (`W_E, W_pos, W_Q, W_K, W_V, W_O, W_in, W_out, W_U`) are directly accessible `nn.Parameter`s; token lookup uses `F.embedding(tokens, self.W_E)` for bit-exact CPU + CUDA determinism.
 - **Optimization ([`src/train.py`](src/train.py)):** Full-batch `AdamW` (`lr = 1e-3`, `betas = (0.9, 0.98)`, uniform `weight_decay`), `40,000` epochs, with logits cast to **`torch.float64`** prior to `F.cross_entropy` to prevent `float32` softmax underflow / slingshots.
-- **Hardware & throughput:** NVIDIA GeForce RTX 5070 (12 GB VRAM), `torch 2.15.0+cu132`, `einops 0.8.2`. Full 40,000-epoch run takes **~88–90 s** (`2.25 s / 1k epochs`), **265.2 MB** peak allocated VRAM, **889.8 KB** per model-only checkpoint.
+- **Hardware & throughput:** NVIDIA GeForce RTX 5070 (12 GB VRAM), Python 3.12.16, `torch 2.15.0+cu132`, `einops 0.8.2` (exact environment: [`eurus-cu132.lock.txt`](eurus-cu132.lock.txt)). Full 40,000-epoch run takes **~88–90 s** (`2.25 s / 1k epochs`), **265.2 MB** peak allocated VRAM, **889.8 KB** per model-only checkpoint.
 
 ---
 
@@ -96,9 +96,9 @@ The code imports itself as the package `grokking`, so run every command from the
 ```bash
 git clone https://github.com/daniyarotegen/grokking.git    # creates ./grokking
 python -m venv .venv && source .venv/bin/activate
-# RTX 50-series (Blackwell) GPUs need a PyTorch build for CUDA 12.8 or later:
-pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install -r grokking/requirements.txt
+pip install -r grokking/requirements.txt          # minimum versions
+# or the exact environment the results came from (Linux, Python 3.12, CUDA 13.2):
+# pip install -r grokking/eurus-cu132.lock.txt
 
 # Sanity suite: shapes, causal mask, split, CPU + CUDA determinism, overfit
 pytest grokking/tests/test_sanity.py -v
@@ -132,6 +132,8 @@ done
 # Robustness checks behind Section 6 (numpy + scipy only; reads the committed runs/)
 python -m grokking.src.robustness
 ```
+
+On Linux, PyPI's `torch 2.15.0` wheel is built for CUDA 13.2 and supports RTX 50-series (Blackwell) GPUs, so no special index is needed.
 
 Stage 5 (weight-decay experiments, pre-registered in [`prereg/WD_PREREGISTRATION.md`](prereg/WD_PREREGISTRATION.md); 110 runs, about 5–6 h on an RTX 5070):
 
