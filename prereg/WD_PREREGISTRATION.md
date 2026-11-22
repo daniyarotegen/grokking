@@ -105,6 +105,40 @@ The lr factor is an assumption under test (H1), not something Stage 4B measured.
 - lr = 2e-3 may destabilise training; that would be reported, not dropped.
 - Grokking time resolution is 100 epochs.
 
+## Amendment 1 (2026-11-22, before any Stage 5 run)
+
+Added after reading the Stage 5 literature report (`LITERATURE_REPORT.md`, agent commit `7ec86fe`)
+and before launching. It changes no code, run grid, decision rule or frozen prediction.
+
+**H4 gains a directional prediction.** He et al. (arXiv:2602.16849) prove, for gradient flow from
+small initialisation, that each neuron's winning frequency is fixed by its initial spectral magnitude
+and phase. They do not address the train/test split.
+*Prediction:* the median key-frequency Jaccard for pairs that share the init seed (different split)
+is higher than for pairs that share the split seed (different init). Reported descriptively from the
+existing H4 output. Their setting (MLP, small-initialisation limit) differs from ours, so a failure
+would be informative rather than a contradiction. Grokking-time decomposition stays exploratory.
+
+**H1 context.** E2 largely replicates published delay laws. Truong et al. (arXiv:2605.18845; and
+arXiv:2603.13331, see the citation note below) and Pracher et al. (arXiv:2609.26679) give a delay
+that scales as 1/(lr·wd) under AdamW, up to constants. Those laws describe the delay *after*
+memorisation, T_grok − T_mem, whereas H1 fits total T_grok. Memorisation time is not expected to
+scale with lr·wd, so b_lr and b_wd are expected slightly shallower than −1, as in Stage 4B (−0.964).
+The decision rule is unchanged.
+*Secondary, exploratory:* repeat the H1 fit on T_grok − T_mem, with T_mem = first logged epoch
+where train accuracy ≥ 0.99.
+
+**H2 context.** The direction (slower with larger α) is consistent with Lyu et al.'s log α term and
+with the log-norm-ratio term of Truong et al., through a larger weight norm at memorisation.
+
+**H3 context.** Pracher et al. report critical slowing near an upper weight-decay cutoff. If the
+1/wd law fails at wd = 3 or 5, the expected direction is *slower* than predicted.
+
+**Citation note.** The arXiv listing for 2603.13331 is titled "Why Grokking Takes So Long: A
+First-Principles Theory of Representational Phase Transitions"; the literature report gives a
+different title. Equation and theorem numbers marked unverified in the report remain unverified.
+All of this is to be checked against the full papers before anything is cited publicly.
+
 ## Deviations
 
-None yet. Any change to the code, grids, or rules after this commit is recorded here with its date and reason.
+None. Amendment 1 adds one prediction and literature context before any run existed; it changes no
+code, grid, decision rule or frozen prediction. Any later change is recorded here with its date and reason.
