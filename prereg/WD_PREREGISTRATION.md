@@ -140,5 +140,35 @@ All of this is to be checked against the full papers before anything is cited pu
 
 ## Deviations
 
-None. Amendment 1 adds one prediction and literature context before any run existed; it changes no
-code, grid, decision rule or frozen prediction. Any later change is recorded here with its date and reason.
+Amendment 1 adds one prediction and literature context before any run existed; it changes no
+code, grid, decision rule or frozen prediction.
+
+### Deviation 1 (2026-11-22, after the H0 check, before H1–H5 were interpreted)
+
+**H0 failed.** Seeds 0, 2 and 3 grokked at 5,700, 10,200 and 4,800 epochs against Stage 4B's
+5,500, 9,500 and 5,500. Seeds 1 and 4 were consistent. Diagnosis:
+
+- **Same starting point.** Epoch-0 training loss for seed 3 is identical to 15 significant digits.
+- **Same code.** `model.py`, `data.py`, `train.py` and the tests are unchanged between the Stage 4B
+  commit (`0fd723a`) and Stage 5 (`a8fb8c2`). The `sweep.py` additions reproduce the original bit for bit
+  on CPU, and logging every 100 vs 500 epochs gives bit-identical training on CPU.
+- **Same environment.** torch 2.15.0+cu132 and NVIDIA driver 595.99.02 in both. Only the Linux
+  kernel, and the driver's kernel-module build for it, changed between the two runs.
+- **The GPU trajectories already differ by epoch 500** (seed 3 train loss 8.270e-4 vs 8.227e-4).
+
+**Conclusion.** GPU arithmetic was not reproducible between these two runs. Small rounding
+differences shift grokking time by about 200–700 epochs, roughly 4–13%. The H0 rule wrongly assumed
+bit-exact reproduction across separate GPU runs. That was a design error in the check, not a fault in
+the pipeline.
+
+**Consequences.**
+1. Comparisons *within* Stage 5 are unaffected: every Stage 5 run comes from one pipeline, and this
+   noise is part of their random error.
+2. Forecasts against the frozen Stage 4B predictions (the H1 forecast error, the H3 score) include this
+   noise floor. Forecast errors below about 10% cannot be distinguished from it.
+3. Stage 4B's recorded commit (`0fd723a`) does not contain `sweep.py`, which was committed after those
+   runs. Stage 4B's sweep code is therefore pinned only by the later export.
+
+**Follow-up after Stage 5.** Rerun one configuration twice on the GPU with identical settings, and once
+with Stage 4B's 500-epoch logging, to establish whether GPU runs are reproducible given identical
+settings.
