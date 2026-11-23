@@ -172,3 +172,17 @@ the pipeline.
 **Follow-up after Stage 5.** Rerun one configuration twice on the GPU with identical settings, and once
 with Stage 4B's 500-epoch logging, to establish whether GPU runs are reproducible given identical
 settings.
+
+### Exploratory plan for H5 (2026-11-23, after the H0–H5 summary, before the per-epoch curves were examined)
+
+The summary showed the alarm tracks individual runs (within-configuration slope +1.07). The follow-up
+is exploratory and fixed here, before the per-epoch curves are looked at:
+
+1. **Forecast out of sample.** At the alarm, predict grokking time as t_alarm × m, with m the median
+   t_grok / t_alarm of the *other* runs: (a) across all configurations, (b) the same configuration's other
+   seeds. Compare with a baseline that ignores the run: the geometric mean t_grok of the same configuration's
+   other seeds. Score: median |log(observed / predicted)|, and how far ahead the forecast is available.
+2. **Is it only memorisation?** Compare t_alarm with t_mem (first logged epoch with train accuracy ≥ 0.99).
+3. **Threshold.** Repeat the counts and the lead time for drops of 5% and 20% (10% stays primary).
+4. **A standard-metric baseline.** The same rule applied to test loss (10% below its running max).
+5. **The exceptions.** Describe the silent runs, the false alarms and the alarms that came after grokking.
