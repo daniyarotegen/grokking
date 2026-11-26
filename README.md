@@ -2,11 +2,13 @@
 
 From-scratch PyTorch + `einops` reproduction of **Nanda et al. (2023)**, *"Progress measures for grokking via mechanistic interpretability"*, extended with a zero-training aliasing diagnostic (Stage 4A), a 30-run multi-seed weight-decay sweep (Stage 4B), and a `seed = 42` double-dissociation control.
 
-> **TL;DR** — I re-implemented a 1-layer transformer from scratch (PyTorch + `einops`) and reproduced Nanda et al.'s finding that, on modular addition, the model first memorises and then suddenly *generalises* ("grokking") by learning a small set of Fourier frequencies. Extending the paper:
-> - The baseline model's remaining test errors are **predictable from its learned frequencies**: all 50 / 50 errors land on the 3 offsets my diagnostic predicts (vs. 5.4% by chance).
-> - Across a **30-run weight-decay × seed sweep**, time-to-generalise scales roughly as `1 / weight_decay`, while *which* frequencies the model learns is fixed by the random seed (24× higher overlap within a seed than across seeds).
+> **TL;DR** — A from-scratch PyTorch + `einops` re-implementation of a 1-layer transformer that reproduces Nanda et al.'s finding: on modular addition the model first memorises, then suddenly *generalises* ("grokking") by learning a small set of Fourier frequencies. The code was written by an AI coding agent that I directed and reviewed ([Section 7](#7-how-this-was-built)). Extending the paper:
+> - In the baseline run (one seed), all 50 remaining test errors land on 3 offsets singled out by a diagnostic built from the learned frequencies (chance: 5.4%). The diagnostic was built after the errors were seen, and its limits are in [Section 6](#6-limitations--robustness-checks).
+> - Across a 30-run weight-decay × seed sweep, time-to-generalise scales close to `1 / weight_decay` (β = −0.96, 95% CI [−1.05, −0.88]), as theory predicts. *Which* frequencies the model learns is largely set by the seed (24× higher overlap within a seed than across seeds), but the seed fixes both the initialisation and the data split, so this sweep cannot say which of the two matters.
 >
 > **Stack:** PyTorch, einops, NumPy/SciPy, pytest · each 40k-epoch run takes ~90 s on an RTX 5070.
+
+Limitations and robustness checks are in [Section 6](#6-limitations--robustness-checks).
 
 ---
 
@@ -15,7 +17,7 @@ From-scratch PyTorch + `einops` reproduction of **Nanda et al. (2023)**, *"Progr
 - **Task:** Modular addition `(a + b) mod 113` formatted as 3 tokens `[a, b, =]` (`=` has ID `113`, vocab `114`, output classes `113`, target at final position index `2`). Deterministic 30% / 70% disjoint split (`3,830` train / `8,939` test pairs covering all `113 × 113 = 12,769` pairs).
 - **Model ([`src/model.py`](src/model.py)):** 1-layer causal Transformer decoder (**226,688** params), no LayerNorm, learned positional embeddings (length `3`), untied `W_E` and `W_U`, ReLU MLP with biases (`b_in`, `b_out`), no attention/unembedding biases, `1 / sqrt(fan_in)` normal init, `d_model = 128`, `n_heads = 4` (`d_head = 32`), `d_mlp = 512`. All 9 weight matrices (`W_E, W_pos, W_Q, W_K, W_V, W_O, W_in, W_out, W_U`) are directly accessible `nn.Parameter`s; token lookup uses `F.embedding(tokens, self.W_E)` for bit-exact CPU + CUDA determinism.
 - **Optimization ([`src/train.py`](src/train.py)):** Full-batch `AdamW` (`lr = 1e-3`, `betas = (0.9, 0.98)`, uniform `weight_decay`), `40,000` epochs, with logits cast to **`torch.float64`** prior to `F.cross_entropy` to prevent `float32` softmax underflow / slingshots.
-- **Hardware & throughput:** NVIDIA GeForce RTX 5070 (12 GB VRAM), `torch 2.15.0+cu132`, `einops 0.8.2`. Full 40,000-epoch run takes **~88–90 s** (`2.25 s / 1k epochs`), **265.2 MB** peak allocated VRAM, **889.8 KB** per model-only checkpoint.
+- **Hardware & throughput:** NVIDIA GeForce RTX 5070 (12 GB VRAM), Python 3.12.16, `torch 2.15.0+cu132`, `einops 0.8.2` (exact environment: [`eurus-cu132.lock.txt`](eurus-cu132.lock.txt)). Full 40,000-epoch run takes **~88–90 s** (`2.25 s / 1k epochs`), **265.2 MB** peak allocated VRAM, **889.8 KB** per model-only checkpoint.
 
 ---
 
@@ -84,7 +86,7 @@ This yields a clean **double dissociation**:
 
 ### 4.3 Three Empirical Observations Across the 30-Run Sweep
 
-1. **Weight-decay budget invariance (`grok_epoch_95 × wd ≈ const(seed)`):** Medians across `wd = 0.5, 1.0, 1.5` are **`7,875`**, **`7,500`**, **`7,500`**. Median within-seed CV is **`7.45%`** (mean `8.61%`) vs. between-seed CV of **`31.75%`** (4.3× larger).
+1. **Weight-decay budget invariance (`grok_epoch_95 × wd ≈ const(seed)`):** Medians across `wd = 0.5, 1.0, 1.5` are **`7,875`**, **`7,500`**, **`7,500`**. Median within-seed CV is **`7.45%`** (mean `8.61%`) vs. between-seed CV of **`31.75%`** (4.3× larger). This 1 / `wd` scaling is not new: Lyu et al. (2024) prove that grokking time is $t_g = \frac{1}{\lambda}\log\alpha$ for homogeneous networks with large initialisation scale $\alpha$ and small weight decay $\lambda$. The sweep is an empirical check of the $1/\lambda$ part on a transformer, which is not homogeneous.
 2. **Spectral lock-in by initialization / split:** Pairwise Jaccard overlap of surviving `K` across `wd` for the **same seed** is **`0.7775`** mean / **`0.8000`** median (`40.0%` exact matches, `n = 30` pairs), vs. **`0.0326`** mean / **`0.0000`** median for **different seeds** (`n = 405` pairs; **24×** higher within-seed lock-in).
 3. **Sparsity–residual tradeoff & equilibrium invariance:** Fewer or less balanced frequencies systematically carry larger non-key residuals (`|K|` vs. `resid_norm_mean_correct`: Spearman **$\rho = -0.7674, p = 7.50 \times 10^{-7}$**; $N_{\text{eff}}$ vs. residual: **$\rho = -0.5760, p = 8.66 \times 10^{-4}$**). Meanwhile, final equilibrium geometry is invariant to `wd ∈ [0.5, 1.5]` (Kruskal-Wallis: $N_{\text{eff}}$ $H = 0.61, p = 0.737$; `weight_l2_norm` $H = 3.26, p = 0.196$, medians `30.38, 29.80, 30.11`; `|K|` $H = 1.59, p = 0.452$). Projecting onto `K` reduces final test loss by a median factor of **`3.56×`** (IQR `[2.89×, 5.75×]`, improving **29 / 30** runs).
 
@@ -95,43 +97,92 @@ This yields a clean **double dissociation**:
 
 ## 5. Reproducibility
 
-The code imports itself as the `grokking` package, so run every command from the directory that **contains** the cloned `grokking/` folder:
+The code imports itself as the package `grokking`, so run every command from the folder that **contains** the clone, not from inside it.
 
 ```bash
-git clone https://github.com/daniyarotegen/grokking
-pip install -r grokking/requirements.txt
-```
+git clone https://github.com/daniyarotegen/grokking.git    # creates ./grokking
+python -m venv .venv && source .venv/bin/activate
+pip install -r grokking/requirements.txt          # minimum versions
+# or the exact environment the results came from (Linux, Python 3.12, CUDA 13.2):
+# pip install -r grokking/eurus-cu132.lock.txt
 
-```bash
-# Stage 1: Mandatory pre-training sanity suite (shapes, causal mask, split, CPU+CUDA determinism, overfit)
-python -m pytest grokking/tests/test_sanity.py -v
+# Sanity suite: shapes, causal mask, split, CPU + CUDA determinism, overfit
+pytest grokking/tests/test_sanity.py -v
 
-# Stage 2: 40,000-epoch baseline run (seed=42, wd=1.0, 161 checkpoints)
-timeout 20m python -m grokking.src.train \
-  --epochs 40000 --seed 42 --log-every 100 --save-every 250 \
+# Stage 2: 40,000-epoch baseline (seed 42, wd 1.0, 161 checkpoints)
+python -m grokking.src.train --epochs 40000 --seed 42 --log-every 100 --save-every 250 \
   --out-dir grokking/runs/baseline_seed42 --device cuda
 
-# Stage 3: 2D DFT verification, progress measures, and Figures 1–3
-python -m grokking.src.analysis \
-  --run-dir grokking/runs/baseline_seed42 --figures-dir grokking/artifacts/figures --device cuda
+# Stage 3: 2D DFT verification, progress measures, Figures 1–3
+python -m grokking.src.analysis --run-dir grokking/runs/baseline_seed42 \
+  --figures-dir grokking/artifacts/figures --device cuda
 
-# Stage 4A: Zero-training aliasing & frequency-dominance diagnostic + Figure 4
-python -m grokking.src.aliasing_diag \
-  --run-dir grokking/runs/baseline_seed42 --figures-dir grokking/artifacts/figures --device cuda
+# Stage 4A: aliasing and frequency-dominance diagnostic, Figure 4
+python -m grokking.src.aliasing_diag --run-dir grokking/runs/baseline_seed42 \
+  --figures-dir grokking/artifacts/figures --device cuda
 
-# Stage 4B: Resumable 30-run weight-decay sweep (wd in {0.5, 1.0, 1.5}, seeds 0–9) + Figures 5–6
+# Stage 4B: resumable 30-run sweep (wd in {0.5, 1.0, 1.5}, seeds 0–9), Figures 5–6
 for WD in 1.0 0.5 1.5; do
-  timeout 20m python -m grokking.src.sweep \
-    --wd "$WD" --seeds 0 1 2 3 4 5 6 7 8 9 --epochs 40000 \
+  python -m grokking.src.sweep --wd "$WD" --seeds 0 1 2 3 4 5 6 7 8 9 --epochs 40000 \
     --out-root grokking/runs/sweep_wd --device cuda
 done
-python -m grokking.src.sweep_plots \
-  --out-root grokking/runs/sweep_wd --figures-dir grokking/artifacts/figures
+python -m grokking.src.sweep_plots --out-root grokking/runs/sweep_wd \
+  --figures-dir grokking/artifacts/figures
 
-# Seed 42 weight-decay control (wd = 0.5 and 1.5)
+# Seed 42 weight-decay control (wd 0.5 and 1.5)
 for WD in 0.5 1.5; do
-  timeout 10m python -m grokking.src.sweep \
-    --wd "$WD" --seeds 42 --epochs 40000 \
+  python -m grokking.src.sweep --wd "$WD" --seeds 42 --epochs 40000 \
     --out-root grokking/runs/seed42_wd_check --device cuda
 done
+
+# Robustness checks behind Section 6 (numpy + scipy only; reads the committed runs/)
+python -m grokking.src.robustness
 ```
+
+On Linux, PyPI's `torch 2.15.0` wheel is built for CUDA 13.2 and supports RTX 50-series (Blackwell) GPUs, so no special index is needed.
+
+`runs/` holds every metric and summary file but no checkpoints (`*.pt` is ignored), so Stages 3 and 4A need Stage 2 to be re-run first. `sweep_plots` and `robustness` work straight from a fresh clone.
+
+---
+
+## 6. Limitations & Robustness Checks
+
+The numbers below come from `python -m grokking.src.robustness`, which re-reads the committed sweep outputs and treats the seed, not the run, as the unit of replication.
+
+1. **The error phenomenon appears in one seed.** All 30 sweep runs (seeds 0–9) reach 100.00% test accuracy at every weight decay. Every finding about where errors fall (Sections 3 and 4.2) therefore comes from `seed = 42` alone, at two weight decays. These findings describe this seed's mechanism; they are not evidence that under-regularised models of this task generally fail this way.
+
+2. **The seed sets both the initialisation and the train/test split.** `set_seed(seed)` runs before the dataset is built, and the split is drawn from the same seed. "Spectral lock-in by initialisation" (observation 2) could equally be lock-in by data split, and seed 42's errors could be a property of its split. Separating the two needs independent seeds for initialisation and split.
+
+3. **Observation 3 does not hold once seeds are the unit.** The 30 runs are 10 seeds × 3 weight decays, and observation 2 shows the seed largely fixes the circuit, so the runs are not independent samples. With one point per seed:
+
+   | | Pooled (n = 30) | One point per seed (n = 10) |
+   | :--- | :---: | :---: |
+   | `\|K\|` vs. residual norm | ρ = −0.767, p = 7.5 × 10⁻⁷ | ρ = −0.440, p = 0.20 |
+   | $N_{\text{eff}}$ vs. residual norm | ρ = −0.576, p = 8.7 × 10⁻⁴ | ρ = −0.552, p = 0.098 |
+
+   The direction is unchanged but the evidence is weak. Treat observation 3 as a hypothesis.
+
+4. **Observation 1 holds up.** Fitting log(`grok_epoch_95`) = a_seed + β · log(`wd`), with a separate intercept per seed, gives **β = −0.964, 95% CI [−1.049, −0.879]** (t, 19 dof). Nine of ten per-seed slopes lie between −0.86 and −1.16 (seed 9: −0.71). Grokking time scales approximately as 1 / `wd`, measured at only three weight-decay values per seed. This confirms a known theoretical prediction (Lyu et al., 2024; see Section 4.3) rather than establishing a new law; the $\log\alpha$ dependence that the theory also predicts was not tested here.
+
+5. **The alias analysis was post hoc, and it predicts a set of offsets rather than a ranking.**
+   - `EXPERIMENT_SPEC.md` does not mention aliasing; the analysis was built after the 50 errors were observed.
+   - The code computes two weightings. Amplitude weights ($w_k \propto \sqrt{E_k}$, used throughout) give a top-3 of ±56, ±10, ±12. Variance weights ($w_k \propto E_k$) give ±34, ±56, ±45, which contain none of the 50 errors. Amplitude weighting is the principled choice, since logits are linear in amplitude, but the result depends on it.
+   - At `wd = 1.0` the three top scores are nearly tied (0.806, 0.805, 0.800), and the top-ranked offset (±56) receives no errors.
+   - At `wd = 0.5` the predicted set is ±10, ±47, ±22. Errors land at ±22 (27), ±36 (8) and ±55 (3); the top two predictions receive none.
+
+   The supported claim: when the key frequencies change, errors leave ±12 and concentrate on a predicted alias, far above the 5.36% chance rate. The analysis does not predict which alias dominates.
+
+6. **One task, one architecture, one training fraction.** Whether the residual-spike mechanism appears for other moduli, deeper models or training fractions other than 30% is untested.
+
+---
+
+## 7. How This Was Built
+
+The code, the experiments and the first draft of this write-up were produced by an AI coding agent (Gemini, in Antigravity) running on my own machine under a separate account without admin rights. My part: choosing the paper to reproduce and which extensions to pursue, setting the scope of each stage, reviewing every result with a second model (Claude) acting as a reviewer, and deciding what to claim. The limitations in Section 6 came out of that review.
+
+---
+
+## References
+
+- Lyu, K., Jin, J., Li, Z., Du, S. S., Lee, J. D., & Hu, W. (2024). Dichotomy of early and late phase implicit biases can provably induce grokking. *ICLR 2024*. [arXiv:2311.18817](https://arxiv.org/abs/2311.18817)
+- Nanda, N., Chan, L., Lieberum, T., Smith, J., & Steinhardt, J. (2023). Progress measures for grokking via mechanistic interpretability. *ICLR 2023*. [arXiv:2301.05217](https://arxiv.org/abs/2301.05217)
