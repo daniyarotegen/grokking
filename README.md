@@ -2,6 +2,12 @@
 
 From-scratch PyTorch + `einops` reproduction of **Nanda et al. (2023)**, *"Progress measures for grokking via mechanistic interpretability"*, extended with a zero-training aliasing diagnostic (Stage 4A), a 30-run multi-seed weight-decay sweep (Stage 4B), and a `seed = 42` double-dissociation control.
 
+> **TL;DR** — I re-implemented a 1-layer transformer from scratch (PyTorch + `einops`) and reproduced Nanda et al.'s finding that, on modular addition, the model first memorises and then suddenly *generalises* ("grokking") by learning a small set of Fourier frequencies. Extending the paper:
+> - The baseline model's remaining test errors are **predictable from its learned frequencies**: all 50 / 50 errors land on the 3 offsets my diagnostic predicts (vs. 5.4% by chance).
+> - Across a **30-run weight-decay × seed sweep**, time-to-generalise scales roughly as `1 / weight_decay`, while *which* frequencies the model learns is fixed by the random seed (24× higher overlap within a seed than across seeds).
+>
+> **Stack:** PyTorch, einops, NumPy/SciPy, pytest · each 40k-epoch run takes ~90 s on an RTX 5070.
+
 ---
 
 ## 1. Task, Architecture & Numerics
@@ -76,7 +82,7 @@ This yields a clean **double dissociation**:
 1. Low $N_{\text{eff}}$ is **not necessary** for aliasing errors: at `wd = 0.5`, `seed = 42` retains 4 balanced frequencies (`N_eff = 3.41`) yet suffers `38` errors (`0` restricted) driven by a **`10.40×`** localized residual spike — and adding `k = 31` shifts both the predicted top-3 aliases (`[±10, ±47, ±22]`) and the actual errors (`27/38` at `Δ = ±22`, `0` at `±12`).
 2. Low $N_{\text{eff}}$ is **not sufficient** for aliasing errors: at `wd = 1.5`, `seed = 42` keeps the exact same `K = [10, 12, 56]` and `N_eff = 1.16` as `wd = 1.0`, yet stronger weight decay eliminates the localized residual spike (`59.7 → 37.1`), dropping test errors from `50` to **`0`** (`test_loss = 2.32e-7`).
 
-### 4.3 Three Empirical Laws Across the 30-Run Sweep
+### 4.3 Three Empirical Observations Across the 30-Run Sweep
 
 1. **Weight-decay budget invariance (`grok_epoch_95 × wd ≈ const(seed)`):** Medians across `wd = 0.5, 1.0, 1.5` are **`7,875`**, **`7,500`**, **`7,500`**. Median within-seed CV is **`7.45%`** (mean `8.61%`) vs. between-seed CV of **`31.75%`** (4.3× larger).
 2. **Spectral lock-in by initialization / split:** Pairwise Jaccard overlap of surviving `K` across `wd` for the **same seed** is **`0.7775`** mean / **`0.8000`** median (`40.0%` exact matches, `n = 30` pairs), vs. **`0.0326`** mean / **`0.0000`** median for **different seeds** (`n = 405` pairs; **24×** higher within-seed lock-in).
@@ -89,37 +95,42 @@ This yields a clean **double dissociation**:
 
 ## 5. Reproducibility
 
-Run all commands from the workspace root (`/home/ml-agent/ml-repro`):
+The code imports itself as the `grokking` package, so run every command from the directory that **contains** the cloned `grokking/` folder:
 
 ```bash
-# Stage 1: Mandatory pre-training sanity suite (6 tests: shapes, causal mask, split, CPU+CUDA determinism, overfit)
-/home/ml-agent/ml-repro/.venv/bin/pytest grokking/tests/test_sanity.py -v
+git clone https://github.com/daniyarotegen/grokking
+pip install -r grokking/requirements.txt
+```
+
+```bash
+# Stage 1: Mandatory pre-training sanity suite (shapes, causal mask, split, CPU+CUDA determinism, overfit)
+python -m pytest grokking/tests/test_sanity.py -v
 
 # Stage 2: 40,000-epoch baseline run (seed=42, wd=1.0, 161 checkpoints)
-timeout 20m /home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.train \
+timeout 20m python -m grokking.src.train \
   --epochs 40000 --seed 42 --log-every 100 --save-every 250 \
   --out-dir grokking/runs/baseline_seed42 --device cuda
 
 # Stage 3: 2D DFT verification, progress measures, and Figures 1–3
-/home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.analysis \
+python -m grokking.src.analysis \
   --run-dir grokking/runs/baseline_seed42 --figures-dir grokking/artifacts/figures --device cuda
 
 # Stage 4A: Zero-training aliasing & frequency-dominance diagnostic + Figure 4
-/home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.aliasing_diag \
+python -m grokking.src.aliasing_diag \
   --run-dir grokking/runs/baseline_seed42 --figures-dir grokking/artifacts/figures --device cuda
 
 # Stage 4B: Resumable 30-run weight-decay sweep (wd in {0.5, 1.0, 1.5}, seeds 0–9) + Figures 5–6
 for WD in 1.0 0.5 1.5; do
-  timeout 20m /home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.sweep \
+  timeout 20m python -m grokking.src.sweep \
     --wd "$WD" --seeds 0 1 2 3 4 5 6 7 8 9 --epochs 40000 \
     --out-root grokking/runs/sweep_wd --device cuda
 done
-/home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.sweep_plots \
+python -m grokking.src.sweep_plots \
   --out-root grokking/runs/sweep_wd --figures-dir grokking/artifacts/figures
 
 # Seed 42 weight-decay control (wd = 0.5 and 1.5)
 for WD in 0.5 1.5; do
-  timeout 10m /home/ml-agent/ml-repro/.venv/bin/python -m grokking.src.sweep \
+  timeout 10m python -m grokking.src.sweep \
     --wd "$WD" --seeds 42 --epochs 40000 \
     --out-root grokking/runs/seed42_wd_check --device cuda
 done
